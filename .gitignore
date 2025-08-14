@@ -1,0 +1,10 @@
+robodual.egg-info/*
+**.pyc
+__pycache__/
+hf_cache/
+*.egg-info/
+datasets/*
+wandb/
+run_log/
+adapter-tmp/
+pretrained_models/
