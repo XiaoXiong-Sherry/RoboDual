@@ -20,6 +20,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+"""
+export CUDA_VISIBLE_DEVICES=7
+export CALVIN_ROOT=/pfs/pfs-uaDOJM/home/xiongxiao/workspace/RoboDual/calvin
+python vla-scripts/evaluate_calvin.py --generalist_path "pretrained_models/OpenVLA-Generalist" --specialist_path "pretrained_models/Specialist/Specialist+Depth+Gripper.pt" --with_depth --with_gripper --with_cfg --log_dir calvin
+"""
 
 """Code to evaluate Calvin."""
 import argparse
@@ -128,7 +133,7 @@ def make_env(dataset_path, observation_space, device):
 def evaluate_policy(model, env, eval_sr_path, eval_result_path, num_procs, procs_id, eval_dir, ep_len, num_sequences, task_name = 'test', enrich_lang=False, debug=False):
     conf_dir = Path(f"{CALVIN_ROOT}/calvin_models") / "conf"
     task_cfg = OmegaConf.load(conf_dir / "callbacks/rollout/tasks/new_playtable_tasks.yaml")
-    task_oracle = hydra.utils.instantiate(task_cfg)
+    task_oracle = hydra.utils.instantiate(task_cfg) # 这行代码加载了 CALVIN 环境中所有子任务的成功条件。
     
     if enrich_lang:
         with open('vla-scripts/enrich_lang_annotations.json', 'r') as f:
@@ -168,6 +173,7 @@ def evaluate_policy(model, env, eval_sr_path, eval_result_path, num_procs, procs
 
 
 def evaluate_sequence(env, model, task_checker, initial_state, eval_sequence, val_annotations, debug, eval_dir, sequence_i, ep_len):
+    # 它的职责是负责执行一个完整的、由多个子任务构成的长序列，并返回模型到底连续成功了多少步。
     robot_obs, scene_obs = get_env_state_for_initial_condition(initial_state)
     env.reset(robot_obs=robot_obs, scene_obs=scene_obs)
     success_counter = 0
@@ -238,6 +244,7 @@ def main(args):
 
     # Load generalist policy
     from transformers import AutoModelForVision2Seq, AutoProcessor, BitsAndBytesConfig
+    
     quantization_config = None
     processor = AutoProcessor.from_pretrained(args.generalist_path, trust_remote_code=True)
     model = AutoModelForVision2Seq.from_pretrained(
@@ -269,8 +276,8 @@ def main(args):
                                                 # set cond_drop_chance > 0 to activate CFG
                                               ).eval()
    
-
-    from openvla.prismatic.vla.action_tokenizer import ActionTokenizer
+    from prismatic.vla.action_tokenizer import ActionTokenizer
+    # from openvla.prismatic.vla.action_tokenizer import ActionTokenizer
     action_tokenizer = ActionTokenizer(processor.tokenizer)
 
     from train_spacialist_calvin import DualSystem
@@ -288,7 +295,7 @@ def main(args):
         'language': ['language']}
     eval_dir = save_path + f'/eval{torch.cuda.current_device()}/'
     os.makedirs(eval_dir, exist_ok=True)
-    env = make_env(os.path.join(CALVIN_ROOT, 'dataset/task_ABC_D'), observation_space, device)
+    env = make_env(os.path.join(CALVIN_ROOT, 'dataset/calvin_debug_dataset'), observation_space, device)
     eva = DualSystemCalvinEvaluation(dual_sys, processor, action_tokenizer)
     dual_sys.eval()
     avg_reward = torch.tensor(evaluate_policy(

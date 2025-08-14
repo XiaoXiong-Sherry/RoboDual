@@ -46,6 +46,9 @@ class DualSystem(torch.nn.Module):
         self.fast_system = fast_system
         self.adapter = adapter
         self.action_tokenizer = action_tokenizer
+        
+        # Set device attribute
+        self.device = fast_system.device
 
         # Set power = 3/4 to get faster convergence
         self.ema_fast_system = EMA(self.fast_system, power = 0.75, beta = 0.9999, update_every = 1).to(fast_system.device)
@@ -166,10 +169,10 @@ class DualSystem(torch.nn.Module):
 @dataclass
 class FinetuneConfig:
     # fmt: off
-    vla_path: str = "/path/to/your/pretrained_generalist_model"                                  # Path to OpenVLA model 
+    vla_path: str = "openvla/openvla-7b"                                  # Path to OpenVLA model 
 
     # Directory Paths
-    data_root_dir: Path = Path("datasets/calvin_abc")               # Path to CALVIN dataset directory
+    data_root_dir: Path = Path("datasets/calvin_debug_dataset")               # Path to CALVIN dataset directory
     dataset_name: str = "calvin"                                    # Name of fine-tuning dataset (e.g., `droid_wipe`)
     run_root_dir: Path = Path("runs")                               # Path to directory to store logs & checkpoints
     adapter_tmp_dir: Path = Path("adapter-tmp")                     # Temporary directory for LoRA weights before fusing
