@@ -29,24 +29,22 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 @dataclass
 class FinetuneConfig:
-    vla_path: str = "openvla-7b"  # Path to OpenVLA model (on HuggingFace Hub)
+    vla_path: str = "openvla/openvla-7b"  # Path to OpenVLA model (on HuggingFace Hub)
 
     # Directory Paths
-    data_root_dir: Path = Path("datasets/calvin_abc")               # Path to CALVIN dataset directory
+    data_root_dir: Path = Path("datasets/calvin_debug_dataset")               # Path to CALVIN dataset directory
     dataset_name: str = "calvin"                                    # Name of fine-tuning dataset (e.g., `droid_wipe`)
     run_root_dir: Path = Path("runs")                               # Path to directory to store logs & checkpoints
     adapter_tmp_dir: Path = Path("adapter-tmp")                     # Temporary directory for LoRA weights before fusing
 
     # Fine-tuning Parameters
-    batch_size: int = 16                                             # Fine-tuning batch size
-    max_steps: int = 1000000                                         # Max number of fine-tuning steps
+    batch_size: int = 8                                            # Fine-tuning batch size
     epochs: int = 50                                                 # Num of training epoches
-    save_steps: int = 20000                                          # Interval for checkpoint saving
     learning_rate: float = 2e-5                                      # Fine-tuning learning rate
     grad_accumulation_steps: int = 4                                 # Gradient accumulation steps
     image_aug: bool = True                                           # Whether to train with image augmentations
     shuffle_buffer_size: int = 100_000                               # Dataloader shuffle buffer size (can reduce if OOM)
-    save_epochs = 5                                                  # Ckpts save schedual
+    save_steps: int = 5000                                                  # Ckpts save schedual
 
     # LoRA Arguments
     use_lora: bool = True                                           # Whether to use LoRA fine-tuning
@@ -183,13 +181,13 @@ def finetune(cfg: FinetuneConfig) -> None:
         wandb.init(name=f"ft+{exp_id}")
 
     # Train!
-    with tqdm.tqdm(total=cfg.max_steps, leave=False) as progress:
+    with tqdm.tqdm(total=cfg.epochs, leave=False) as progress:
         vla.train()
         optimizer.zero_grad()
         global_step = 0
         for e in range(cfg.epochs):
-            progress.set_description("Epoch " + str(e+1))
             for step_idx, batch in enumerate(dataloader):
+                progress.set_description("Step " + str(global_step))
                 global_step += 1
                 with accelerator.autocast():
                     input_ids = batch["input_ids"].to(device_id)
@@ -241,12 +239,12 @@ def finetune(cfg: FinetuneConfig) -> None:
                     
 
             # Save Model Checkpoint =>> by default, only keeps the latest checkpoint, continually overwriting it!
-            if global_step > 0 and (e + 1) % cfg.save_epochs == 0:
+            if global_step > 0 and (global_step + 1) % cfg.save_steps == 0:
                 if accelerator.is_main_process:
-                    print(f"Saving Model Checkpoint for Step {step_idx}")
+                    print(f"Saving Model Checkpoint for Step {global_step}")
 
                     # We save all ckpts (instead of just the last one)
-                    tmp_exp_name = exp_id + f'_epoch-{e}'
+                    tmp_exp_name = exp_id + f'step-{global_step}'
                     run_dir, adapter_dir = cfg.run_root_dir / tmp_exp_name, cfg.adapter_tmp_dir / tmp_exp_name
                     save_dir = adapter_dir if cfg.use_lora else run_dir
 
