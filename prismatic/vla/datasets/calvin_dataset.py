@@ -486,6 +486,10 @@ class BaseCalvinDataset(Dataset):
         image = copy.deepcopy(sequence["rgb_obs"]["rgb_static"].numpy())
         image_vla = Image.fromarray(image[0].astype(np.uint8))
         pixel_values = self.image_transform(image_vla)
+        
+        # Goal image is the last frame showing completed task state
+        goal_image_vla = Image.fromarray(image[-1].astype(np.uint8))
+        goal_pixel_values = self.image_transform(goal_image_vla)
 
         # third-view RGB (we load consecutive two frames)
         image_dp = Image.fromarray(image[pred_actions].astype(np.uint8))
@@ -558,6 +562,7 @@ class BaseCalvinDataset(Dataset):
         dataset_name = 'calvin'
 
         return dict(pixel_values=pixel_values, 
+                    goal_pixel_values=goal_pixel_values,
                     pixel_values_dp=pixel_values_dp, 
                     prev_pixel_values_dp=prev_pixel_values_dp,
                     depth_image=depth_image,
